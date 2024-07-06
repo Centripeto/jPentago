@@ -10,24 +10,24 @@ public class TrisGame extends AbstractGame<TrisGameState, TrisAction> implements
     private final List<Agent<TrisGameState, TrisAction>> players;
     private TrisGameState currentState;
     private int currentPlayer; //id del giocatore di turno;
+    private BasicUtilityStrategy utilityStrategy;
 
     public TrisGame(int playerCount) {
         super(playerCount);
-        currentState = new TrisGameState(new Board(), 0);
+        currentState = new TrisGameState(new Board(), 0, new BasicUtilityStrategy());
         currentPlayer = 0;
         players = new ArrayList<>();
+        utilityStrategy = new BasicUtilityStrategy();
         initializePlayers();
     }
 
     private void initializePlayers() {
         Player player1 = new Player(0);
-        //MCTSAlgorithm<TrisAction,TrisGameState> mcts2 = new MCTSAlgorithm<>(5000,Math.sqrt(2.0));
-        MCTSAlgorithm<TrisAction, TrisGameState> mcts = new MCTSAlgorithm<>(1000, Math.sqrt(2.0));
-        MCTSPlayer player2 = new MCTSPlayer(1, mcts);
-        //MCTSPlayer player3 = new MCTSPlayer(1,mcts2);
         players.add(player1);
+
+        MCTSAlgorithm<TrisAction, TrisGameState> mcts = new MCTSAlgorithm<>(1000, Math.sqrt(2.0));
+        MCTSPlayer player2 = new MCTSPlayer(1, mcts, utilityStrategy);
         players.add(player2);
-        //players.add(player3);
     }
 
     public void playGame() {
@@ -38,6 +38,7 @@ public class TrisGame extends AbstractGame<TrisGameState, TrisAction> implements
             currentPlayer = currentState.getCurrentPlayer();
             TrisAction action = players.get(currentPlayer).getAction(currentState);
             currentState = this.getNextState(currentState, action);
+            System.out.println();
             currentState.getBoard().display();
         } while (!currentState.isTerminalNode());
 
@@ -107,5 +108,4 @@ public class TrisGame extends AbstractGame<TrisGameState, TrisAction> implements
     public TrisGameState getInitialState() {
         return null;
     }
-
 }

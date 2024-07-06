@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-class DefaultDataCollector<T extends GameState<E>, E extends Action> implements DataCollector<T, E> {
+public class DefaultDataCollector<T extends GameState<E>, E extends Action> implements DataCollector<T, E> {
     private List<Map<String, Object>> collectedData = new ArrayList<>();
 
     @Override

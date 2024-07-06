@@ -8,13 +8,12 @@ import java.util.*;
 /**
  * Represents a node in the Monte Carlo Tree Search (MCTS) algorithm.
  */
-public class MCTSNode<E extends Action,T extends GameState<E>> {
+public class MCTSNode<T extends GameState<E>, E extends Action> {
     private T state;
-    private MCTSNode<E,T> parentNode;
-    private Map<E, MCTSNode<E,T>> childNodes;
+    private MCTSNode<T, E> parentNode;
+    private Map<E, MCTSNode<T, E>> childNodes;
     private double totalReward;
     private int visitCount;
-    private boolean isLeaf;
 
     /**
      * Constructs a new MCTSNode.
@@ -22,13 +21,12 @@ public class MCTSNode<E extends Action,T extends GameState<E>> {
      * @param state  the game state represented by this node.
      * @param parentNode the parent node.
      */
-    public MCTSNode(T state, MCTSNode<E,T> parentNode) {
+    public MCTSNode(T state, MCTSNode<T, E> parentNode) {
         this.state = state;
         this.parentNode = parentNode;
         this.childNodes = new HashMap<>();
         this.totalReward = 0.0;
         this.visitCount = 0;
-        this.isLeaf = true;
     }
 
     /**
@@ -37,7 +35,11 @@ public class MCTSNode<E extends Action,T extends GameState<E>> {
      * @return true if this node is terminal, false otherwise.
      */
     public boolean isTerminal() {
-        return isLeaf && state.isTerminalNode();
+        return state.isTerminalNode();
+    }
+
+    public boolean isFullyExpanded() {
+        return childNodes.size() == state.getAvailableActions(state.getCurrentPlayer()).size();
     }
 
     /**
@@ -46,10 +48,10 @@ public class MCTSNode<E extends Action,T extends GameState<E>> {
      * @param explorationConstant the exploration constant.
      * @return the selected action.
      */
-    public MCTSNode<E,T> selectChild(double explorationConstant) {
+    public MCTSNode<T, E> selectChild(double explorationConstant) {
         return childNodes.values().stream()
-                .max(Comparator.comparing(node -> node.getUCBValue(explorationConstant)))
-                .orElseThrow(IllegalStateException::new);
+                .max(Comparator.comparingDouble(child -> calculateUCB(child, explorationConstant)))
+                .orElseThrow(() -> new IllegalStateException("No children to select"));
     }
 
     /**
@@ -58,23 +60,19 @@ public class MCTSNode<E extends Action,T extends GameState<E>> {
      * @param explorationConstant the exploration constant.
      * @return the UCB value.
      */
-    public double getUCBValue(double explorationConstant) {
-        if (visitCount == 0) {
+    private double calculateUCB(MCTSNode<T, E> child, double explorationConstant) {
+        if (child.visitCount == 0) {
             return Double.POSITIVE_INFINITY;
         }
-        return totalReward / visitCount + explorationConstant * Math.sqrt(Math.log(parentNode.visitCount) / visitCount);
+        double exploitation = child.totalReward / child.visitCount;
+        double exploration = Math.sqrt(Math.log(this.visitCount) / child.visitCount);
+        return exploitation + explorationConstant * exploration;
     }
 
-    /**
-     * Select the best action of this node based on the ratio of reward to visits.
-     *
-     * @return the best action.
-     */
-    public E selectBestAction() {
-        return childNodes.entrySet().stream()
-                .max(Comparator.comparingDouble(entry -> entry.getValue().totalReward / entry.getValue().visitCount))
-                .map(Map.Entry::getKey)
-                .orElseThrow(IllegalStateException::new);
+    public List<E> getUntriedActions() {
+        List<E> availableActions = state.getAvailableActions(state.getCurrentPlayer());
+        availableActions.removeAll(childNodes.keySet());
+        return availableActions;
     }
 
     /**
@@ -101,7 +99,7 @@ public class MCTSNode<E extends Action,T extends GameState<E>> {
      *
      * @return the parent node of this node.
      */
-    public MCTSNode<E,T> getParentNode() {
+    public MCTSNode<T, E> getParentNode() {
         return parentNode;
     }
 
@@ -110,7 +108,7 @@ public class MCTSNode<E extends Action,T extends GameState<E>> {
      *
      * @return a map of actions to child nodes.
      */
-    public Map<E, MCTSNode<E,T>> getChildNodes() {
+    public Map<E, MCTSNode<T, E>> getChildNodes() {
         return childNodes;
     }
 
@@ -132,40 +130,27 @@ public class MCTSNode<E extends Action,T extends GameState<E>> {
         return visitCount;
     }
 
-    /**
-     * Checks if this node is a leaf node.
-     *
-     * @return true if this node is a leaf, false otherwise.
-     */
-    public boolean isLeaf() {
-        return isLeaf;
-    }
-
-    /**
-     * Sets the new value for the variable isLeaf
-     *
-     * @param leaf the new boolean value
-     */
-    public void setLeaf(boolean leaf) {
-        isLeaf = leaf;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof MCTSNode mctsNode)) return false;
-        return Objects.equals(state, mctsNode.state) && Objects.equals(parentNode, mctsNode.parentNode) && Objects.equals(childNodes, mctsNode.childNodes);
+        if (o == null || getClass() != o.getClass()) return false;
+        MCTSNode<?, ?> mctsNode = (MCTSNode<?, ?>) o;
+        return Objects.equals(state, mctsNode.state);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(state, parentNode, childNodes);
+        return Objects.hash(state);
     }
 
-    //Ci dice se un nodo è pienamente espanso
-    public boolean isFullyExpanded() {
-        int numOfAvailableActions = this.getState().getAvailableActions(getState().getCurrentPlayer()).size();
-        return numOfAvailableActions == this.getChildNodes().size();
+    @Override
+    public String toString() {
+        return "MCTSNode{" +
+                "state=" + state +
+                ", visitCount=" + visitCount +
+                ", totalReward=" + totalReward +
+                ", childNodes=" + childNodes.size() +
+                '}';
     }
 
     public int numOfLegalActions(){

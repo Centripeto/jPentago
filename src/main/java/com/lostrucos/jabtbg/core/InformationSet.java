@@ -6,7 +6,6 @@ import java.util.List;
  * Represents the information set for a player in a particular point of the game.
  */
 public interface InformationSet {
-
     /**
      * Returns a representation of the information set.
      *
@@ -47,5 +46,4 @@ public interface InformationSet {
 
     // Restituisce l'utilità media per il giocatore associato a questo insieme di informazioni, calcolata su tutti gli stati di gioco possibili.
     double getAverageUtility();
-
 }

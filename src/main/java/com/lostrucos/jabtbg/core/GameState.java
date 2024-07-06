@@ -7,7 +7,6 @@ import java.util.List;
  * A GameState is derived from the current composition of the game information.
  */
 public interface GameState<E extends Action>{
-
     /**
      * Returns the index of the current player.
      *
@@ -60,6 +59,5 @@ public interface GameState<E extends Action>{
 
     List<E> getAvailableActions(int playerIndex);  //restituisce le azioni disponibili per un giocatore in questo stato
 
-    //TODO: da levare, ma da errore su altri algoritmi
     double getUtility(int playerIndex);
 }

@@ -2,6 +2,8 @@ package com.lostrucos.jabtbg.tris;
 
 import com.lostrucos.jabtbg.core.GameState;
 import com.lostrucos.jabtbg.core.InformationSet;
+import com.lostrucos.jabtbg.core.UtilityStrategy;
+import it.unicam.pentago.models.PentagoBoard;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,10 +16,12 @@ public class TrisGameState implements GameState<TrisAction> {
     private Board board;
     private int currentPlayer;
     private boolean isTie = false;
+    private BasicUtilityStrategy utilityStrategy;
 
-    public TrisGameState(Board board, int currentPlayer) {
+    public TrisGameState(Board board, int currentPlayer, BasicUtilityStrategy utilityStrategy) {
         this.board = board;
         this.currentPlayer = currentPlayer;
+        this.utilityStrategy = utilityStrategy;
     }
 
     @Override
@@ -109,7 +113,7 @@ public class TrisGameState implements GameState<TrisAction> {
                 copyBoard.getBoard()[i][j] = this.board.getBoard()[i][j];
             }
         }
-        return new TrisGameState(copyBoard, copyPlayer);
+        return new TrisGameState(copyBoard, copyPlayer, utilityStrategy);
     }
 
     private boolean checkRow() {
@@ -136,22 +140,86 @@ public class TrisGameState implements GameState<TrisAction> {
         return false;
     }
 
-    //non verrà utilizzato nel tris
+    public int checkForWinner() {
+        // Check horizontal, vertical, and diagonal lines
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                if (board.getBoard()[i][j] == Symbol.CIRCLE) {
+                    if (checkRowCircle() || checkColumnsCircle() || checkDiagonalsCircle()) {
+                        return 0;
+                    }
+                } else if (board.getBoard()[i][j] == Symbol.CROSS) {
+                    if (checkRowCross() || checkColumnsCross() || checkDiagonalsCross()) {
+                        return 1;
+                    }
+                }
+            }
+        }
+        return -1; // No winner
+    }
+
+    private boolean checkRowCircle() {
+        for (int i = 0; i < 3; i++) {
+            if (board.getBoard()[i][0] == board.getBoard()[i][1] && board.getBoard()[i][1] == board.getBoard()[i][2] && board.getBoard()[i][0] == Symbol.CIRCLE)
+                return true;
+        }
+        return false;
+    }
+
+    private boolean checkColumnsCircle() {
+        for (int i = 0; i < 3; i++) {
+            if (board.getBoard()[0][i] == board.getBoard()[1][i] && board.getBoard()[1][i] == board.getBoard()[2][i] && board.getBoard()[0][i] == Symbol.CIRCLE)
+                return true;
+        }
+        return false;
+    }
+
+    private boolean checkDiagonalsCircle() {
+        if (board.getBoard()[0][0] == board.getBoard()[1][1] && board.getBoard()[1][1] == board.getBoard()[2][2] && board.getBoard()[0][0] == Symbol.CIRCLE)
+            return true;
+        if (board.getBoard()[0][2] == board.getBoard()[1][1] && board.getBoard()[1][1] == board.getBoard()[2][0] && board.getBoard()[0][2] == Symbol.CIRCLE)
+            return true;
+        return false;
+    }
+
+    private boolean checkRowCross() {
+        for (int i = 0; i < 3; i++) {
+            if (board.getBoard()[i][0] == board.getBoard()[i][1] && board.getBoard()[i][1] == board.getBoard()[i][2] && board.getBoard()[i][0] == Symbol.CROSS)
+                return true;
+        }
+        return false;
+    }
+
+    private boolean checkColumnsCross() {
+        for (int i = 0; i < 3; i++) {
+            if (board.getBoard()[0][i] == board.getBoard()[1][i] && board.getBoard()[1][i] == board.getBoard()[2][i] && board.getBoard()[0][i] == Symbol.CROSS)
+                return true;
+        }
+        return false;
+    }
+
+    private boolean checkDiagonalsCross() {
+        if (board.getBoard()[0][0] == board.getBoard()[1][1] && board.getBoard()[1][1] == board.getBoard()[2][2] && board.getBoard()[0][0] == Symbol.CROSS)
+            return true;
+        if (board.getBoard()[0][2] == board.getBoard()[1][1] && board.getBoard()[1][1] == board.getBoard()[2][0] && board.getBoard()[0][2] == Symbol.CROSS)
+            return true;
+        return false;
+    }
+
+    //non viene utilizzato nel tris
     @Override
     public List<Integer> getPlayersInGame() {
         return null;
     }
 
-    //non verrà utilizzato nel tris
+    //non viene utilizzato nel tris
     @Override
     public boolean isPlayerStillInGame(int player) {
         return false;
     }
 
-    //TODO: da levare
     @Override
     public double getUtility(int playerIndex) {
-        return 0;
+        return utilityStrategy.calculateUtility(this, playerIndex);
     }
-
 }

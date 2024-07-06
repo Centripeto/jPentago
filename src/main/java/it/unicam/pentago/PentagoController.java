@@ -1,7 +1,10 @@
 package it.unicam.pentago;
 
-import com.lostrucos.jabtbg.core.*;
 import com.lostrucos.jabtbg.algorithms.mcts.MCTSAlgorithm;
+import com.lostrucos.jabtbg.core.*;
+import com.lostrucos.jabtbg.core.UtilityStrategy;
+import it.unicam.pentago.models.*;
+import it.unicam.pentago.strategies.BalancedPentagoUtility;
 import javafx.application.Platform;
 
 import java.util.ArrayList;
@@ -9,15 +12,18 @@ import java.util.List;
 
 public class PentagoController implements Game<PentagoGameState, PentagoAction> {
     private PentagoGameState currentState;
+    private PentagoGameState previousState;
     private Agent<PentagoGameState, PentagoAction> player1;
     private Agent<PentagoGameState, PentagoAction> player2;
     private PentagoLogger logger;
     private PentagoGame gameView;
+    private PentagoDataManager dataManager;
     private boolean isAIvsAI;
 
     public PentagoController(PentagoGame gameView) {
         this.gameView = gameView;
         this.logger = new PentagoLogger(gameView.getGameLog());
+        this.dataManager = new PentagoDataManager();
     }
 
     public void setupNewGame(String player1Type, String player2Type, String difficulty1, String difficulty2, String startingPlayer) {
@@ -26,12 +32,14 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
                 "Giocatore 2".equals(startingPlayer) ? 1 :
                         (int) (Math.random() * 2);
         currentState = new PentagoGameState(initialBoard, initialPlayer);
+        previousState = null;
 
         player1 = createAgent(player1Type, 0, difficulty1);
         player2 = createAgent(player2Type, 1, difficulty2);
 
         isAIvsAI = player1 instanceof AIAgent && player2 instanceof AIAgent;
 
+        gameView.resetGame();
         updateGameView();
         if (currentState.getCurrentPlayer() == 1) {
             makeMove(player2);
@@ -45,7 +53,8 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
             return new HumanAgent(playerIndex);
         } else {
             Algorithm<PentagoGameState, PentagoAction> algorithm = createAlgorithm(type, difficulty);
-            return new AIAgent(algorithm, playerIndex);
+            UtilityStrategy utilityStrategy = createUtilityStrategy(difficulty);
+            return new AIAgent(playerIndex, algorithm, utilityStrategy);
         }
     }
 
@@ -55,41 +64,33 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
             case "Monte Carlo Tree Search":
                 return new MCTSAlgorithm<>(iterations, Math.sqrt(2));
             /*case "Minimax":
-                return new MinimaxAlgorithm<>(getDifficultyLevel(difficulty));
+                return new MinimaxAlgorithm<>(iterations);
             case "Minimax con Alfa-Beta pruning":
-                return new AlphaBetaAlgorithm<>(getDifficultyLevel(difficulty));*/
+                return new AlphaBetaAlgorithm<>(iterations);*/
             default:
                 throw new IllegalArgumentException("Algoritmo non riconosciuto: " + type);
         }
     }
 
-    private int getIterationsForDifficulty(String difficulty) {
+    private UtilityStrategy<PentagoGameState, PentagoAction> createUtilityStrategy(String difficulty) {
         switch (difficulty) {
             case "Facile":
-                return 10000;
+                return new BalancedPentagoUtility();
             case "Normale":
-                return 50000;
+                return new BalancedPentagoUtility();
             case "Difficile":
-                return 100000;
-            case "Competitiva":
-                return 200000;
+                return new BalancedPentagoUtility();
             default:
-                return 50000; // Valore di default
+                return new BalancedPentagoUtility();
         }
     }
 
-    private int getDifficultyLevel(String difficulty) {
+    private int getIterationsForDifficulty(String difficulty) {
         switch (difficulty) {
-            case "Facile":
-                return 2;
-            case "Normale":
-                return 3;
-            case "Difficile":
-                return 4;
-            case "Competitiva":
-                return 5;
-            default:
-                return 3; // Valore di default
+            case "Facile": return 500;
+            case "Normale": return 1000;
+            case "Difficile": return 2000;
+            default: return 100000;
         }
     }
 
@@ -101,7 +102,8 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
                 gameView.showRotationOptions();
             }
         } else {
-            gameView.showErrorDialog("Mossa non valida", "Questa cella è già occupata. Scegli un'altra cella.");
+            gameView.setInstructionText("Questa cella è già occupata. Scegli un'altra cella.");
+            gameView.setRedTextColor();
         }
     }
 
@@ -125,21 +127,35 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
         if (agent instanceof AIAgent) {
             new Thread(() -> {
                 try {
+                    long startTime = System.nanoTime();
                     PentagoAction aiAction = agent.getAction(currentState);
-                    Platform.runLater(() -> {
-                        applyAction(aiAction);
-                        if (!currentState.isTerminalNode()) {
-                            if (isAIvsAI) {
-                                makeMove(currentState.getCurrentPlayer() == 0 ? player1 : player2);
+                    long endTime = System.nanoTime();
+                    long decisionTime = (endTime - startTime) / 1_000_000; // In millisecondi
+
+                    System.out.println("AI ha scelto l'azione: " + aiAction + " in " + decisionTime + "ms");
+
+                    if (aiAction != null) {
+                        Platform.runLater(() -> {
+                            applyAction(aiAction);
+                            dataManager.logAction(currentState, aiAction, currentState.getCurrentPlayer(), decisionTime);
+                            if (!currentState.isTerminalNode()) {
+                                if (isAIvsAI) {
+                                    makeMove(currentState.getCurrentPlayer() == 0 ? player1 : player2);
+                                } else {
+                                    updateGameView();
+                                }
                             } else {
-                                updateGameView();
+                                handleGameEnd();
                             }
-                        } else {
-                            handleGameEnd();
-                        }
-                    });
+                        });
+                    } else {
+                        System.err.println("L'IA non è riuscita a scegliere un'azione valida.");
+                        Platform.runLater(this::handleGameEnd);
+                    }
                 } catch (Exception e) {
-                    Platform.runLater(() -> gameView.showErrorDialog("Errore AI", "Si è verificato un errore durante il turno dell'AI: " + e.getMessage()));
+                    System.err.println("Errore durante la scelta dell'azione dell'IA: " + e.getMessage());
+                    e.printStackTrace();
+                    Platform.runLater(this::handleGameEnd);
                 }
             }).start();
         } else {
@@ -148,35 +164,41 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
     }
 
     private void applyAction(PentagoAction action) {
-        System.out.println("Applicando l'azione: " + action); // Debug
+        previousState = currentState;
         PentagoBoard newBoard = currentState.getBoard().deepCopy();
         newBoard.setCell(action.getRow(), action.getCol(), currentState.getCurrentPlayer() + 1);
         newBoard.rotateQuadrant(action.getQuadrant(), action.isClockwise());
-        //gameView.rotateQuadrant(action.getQuadrant(), action.isClockwise());
         currentState = new PentagoGameState(newBoard, 1 - currentState.getCurrentPlayer());
+
         logger.logAction(action, action.getPlayer() == 0 ? "Giocatore 1" : "Giocatore 2");
         updateGameView();
+        //gameView.rotateQuadrant(action.getQuadrant(), action.isClockwise());
+
+        if (previousState != null) {
+            gameView.updateGameHistory(previousState, currentState);
+            previousState = null;
+        }
     }
 
     private void updateGameView() {
         gameView.updateBoard(currentState.getBoard());
         String currentPlayerName = currentState.getCurrentPlayer() == 0 ? "Giocatore 1" : "Giocatore 2";
         gameView.setInstructionText("Turno di " + currentPlayerName + ". Posiziona un segnalino.");
-        gameView.hideRotationOptions(); // Assicurati che le opzioni di rotazione siano nascoste all'inizio del nuovo turno
+        gameView.hideRotationOptions();
     }
 
     private void handleGameEnd() {
         int winner = currentState.checkForWinner();
-        List<int[]> winningCells = findWinningCells(winner + 1);
-        gameView.highlightWinningCells(winningCells);
-
         if (winner == -1) {
             gameView.showGameEndDialog("La partita è terminata in pareggio!");
         } else {
             String winnerName = winner == 0 ? "Giocatore 1" : "Giocatore 2";
+            List<int[]> winningCells = findWinningCells(winner + 1);
+            gameView.highlightWinningCells(winningCells);
             gameView.showGameEndDialog(winnerName + " ha vinto la partita!");
         }
         logger.saveLogToFile();
+        gameView.showSaveLogDialog(format -> dataManager.saveLogToFile(format));
     }
 
     private List<int[]> findWinningCells(int player) {
@@ -212,6 +234,10 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
             cells.add(new int[]{row, col});
         }
         return true;
+    }
+
+    public PentagoDataManager getDataManager() {
+        return dataManager;
     }
 
     @Override

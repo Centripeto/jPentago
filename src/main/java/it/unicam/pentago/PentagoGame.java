@@ -1,12 +1,16 @@
 package it.unicam.pentago;
 
+import it.unicam.pentago.models.PentagoBoard;
+import it.unicam.pentago.models.PentagoGameState;
 import javafx.animation.RotateTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.control.*;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.*;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
@@ -26,6 +30,7 @@ import javafx.util.Duration;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class PentagoGame extends Application {
@@ -57,6 +62,9 @@ public class PentagoGame extends Application {
     private Slider musicVolumeSlider;
     private Slider effectsVolumeSlider;
     private ComboBox<String> resolutionComboBox;
+    private VBox gameHistoryRoot;
+    private ScrollPane gameHistoryScrollPane;
+    private Stage historyStage;
 
     @Override
     public void start(Stage primaryStage) {
@@ -65,6 +73,7 @@ public class PentagoGame extends Application {
         this.initializeAudio();
         this.createMenuScene();
         this.createGameScene();
+        this.createGameHistoryView();
 
         this.primaryStage.setScene(this.menuScene);
         this.primaryStage.setTitle("Pentago");
@@ -89,7 +98,7 @@ public class PentagoGame extends Application {
         menuRoot.setStyle("-fx-background-color: #333333;");
 
         Button newGameButton = new Button("Avvia nuova partita");
-        Button resumeGameButton = new Button("Riprendi partita");
+        //Button resumeGameButton = new Button("Riprendi partita");
         Button optionsButton = new Button("Opzioni");
         Button rulesButton = new Button("Regolamento");
         Button creditsButton = new Button("Crediti");
@@ -97,9 +106,9 @@ public class PentagoGame extends Application {
 
         newGameButton.setOnAction(event -> this.showNewGameDialog());
         optionsButton.setOnAction(event -> this.showOptionsMenu());
-        exitButton.setOnAction(event -> this.primaryStage.close());
+        exitButton.setOnAction(event -> this.primaryStage.close()); //Deve chiudere anche la finestra del menù pausa, delle opzioni, lo storico ed eventuali finestre di dialogo aperte TODO
 
-        menuRoot.getChildren().addAll(newGameButton, resumeGameButton, optionsButton, rulesButton, creditsButton, exitButton);
+        menuRoot.getChildren().addAll(newGameButton, /*resumeGameButton,*/ optionsButton, rulesButton, creditsButton, exitButton);
 
         this.menuScene = new Scene(menuRoot, 800, 600);
     }
@@ -119,21 +128,21 @@ public class PentagoGame extends Application {
 
         ComboBox<String> player1TypeComboBox = new ComboBox<>();
         ComboBox<String> player2TypeComboBox = new ComboBox<>();
-        player1TypeComboBox.getItems().addAll("Umano", "Monte Carlo Tree Search", "Minimax", "Minimax con Alfa-Beta pruning");
-        player2TypeComboBox.getItems().addAll("Umano", "Monte Carlo Tree Search", "Minimax", "Minimax con Alfa-Beta pruning");
+        player1TypeComboBox.getItems().addAll("Umano", "Monte Carlo Tree Search");
+        player2TypeComboBox.getItems().addAll("Umano", "Monte Carlo Tree Search");
         player1TypeComboBox.setValue("Umano");
         player2TypeComboBox.setValue("Monte Carlo Tree Search");
 
         ComboBox<String> player1DifficultyComboBox = new ComboBox<>();
         ComboBox<String> player2DifficultyComboBox = new ComboBox<>();
-        player1DifficultyComboBox.getItems().addAll("Facile", "Normale", "Difficile", "Competitiva");
-        player2DifficultyComboBox.getItems().addAll("Facile", "Normale", "Difficile", "Competitiva");
+        player1DifficultyComboBox.getItems().addAll("Facile", "Normale", "Difficile");
+        player2DifficultyComboBox.getItems().addAll("Facile", "Normale", "Difficile");
         player1DifficultyComboBox.setValue("Normale");
         player2DifficultyComboBox.setValue("Normale");
 
         ComboBox<String> startingPlayerComboBox = new ComboBox<>();
         startingPlayerComboBox.getItems().addAll("Giocatore 1", "Giocatore 2", "Casuale");
-        startingPlayerComboBox.setValue("Casuale");
+        startingPlayerComboBox.setValue("Giocatore 1");
 
         grid.add(new Label("Giocatore 1:"), 0, 0);
         grid.add(player1TypeComboBox, 1, 0);
@@ -168,13 +177,14 @@ public class PentagoGame extends Application {
 
     private void createGameScene() {
         this.gameRoot = new VBox(5);
-        this.gameRoot.setPadding(new Insets(10, 10, 10, 10));
+        this.gameRoot.setPadding(new Insets(20, 10, 10, 10));
         this.gameRoot.setStyle("-fx-background-color: #f0f0f0;");
 
         HBox topBar = this.createTopBar();
 
         HBox mainContent = new HBox(10);
         mainContent.setAlignment(Pos.CENTER);
+        mainContent.setPrefHeight(600);
 
         StackPane boardContainer = new StackPane();
 
@@ -182,7 +192,7 @@ public class PentagoGame extends Application {
         boardContainer.getChildren().add(boardGrid);
 
         VBox instructionArea = new VBox(10);
-        instructionArea.setStyle("-fx-background-color: white; -fx-border-color: gray; -fx-border-width: 3px;");
+        instructionArea.setStyle("-fx-border-color: gray; -fx-border-width: 3px;");
         instructionArea.setPadding(new Insets(10));
         instructionArea.setAlignment(Pos.CENTER);
         this.instructionLabel = new Label("");
@@ -193,8 +203,9 @@ public class PentagoGame extends Application {
         gameArea.getChildren().addAll(boardContainer, instructionArea);
 
         this.gameLog = new TextArea();
+        this.gameLog.setStyle("-fx-border-color: gray; -fx-border-width: 3px;");
         this.gameLog.setEditable(false);
-        this.gameLog.setPrefWidth(200);
+        this.gameLog.setPrefWidth(500);
 
         mainContent.getChildren().addAll(gameArea, this.gameLog);
 
@@ -212,14 +223,14 @@ public class PentagoGame extends Application {
         topBar.setAlignment(Pos.CENTER_LEFT);
 
         ImageView homeIcon = new ImageView(new Image(getClass().getResourceAsStream("/images/home-icon.png")));
-        homeIcon.setFitHeight(40);
-        homeIcon.setFitWidth(40);
+        homeIcon.setFitHeight(50);
+        homeIcon.setFitWidth(50);
         homeIcon.setOnMouseClicked(e -> this.showPauseMenu());
 
         ImageView treeIcon = new ImageView(new Image(getClass().getResourceAsStream("/images/tree-icon.png")));
-        treeIcon.setFitHeight(40);
-        treeIcon.setFitWidth(40);
-        treeIcon.setOnMouseClicked(e -> this.showGameTree());
+        treeIcon.setFitHeight(50);
+        treeIcon.setFitWidth(50);
+        treeIcon.setOnMouseClicked(e -> this.showGameHistory());
 
         topBar.getChildren().addAll(homeIcon, treeIcon);
 
@@ -236,9 +247,9 @@ public class PentagoGame extends Application {
         StackPane boardContainer = new StackPane();
         boardContainer.setStyle("-fx-background-color: #1e555c; -fx-border-color: gray; -fx-border-width: 3px;");
 
-        Rectangle woodenBackground = new Rectangle(390, 390);
-        woodenBackground.setFill(Paint.valueOf("#4c2f27"));
-        boardContainer.getChildren().add(woodenBackground);
+        Rectangle woodenTable = new Rectangle(390, 390);
+        woodenTable.setFill(Paint.valueOf("#4c2f27"));
+        boardContainer.getChildren().add(woodenTable);
 
         for (int q = 0; q < 4; q++) {
             this.quadrants[q] = new GridPane();
@@ -473,7 +484,14 @@ public class PentagoGame extends Application {
         optionsRoot.setStyle("-fx-background-color: #f0f0f0;");
 
         this.musicVolumeSlider = new Slider(0, 100, 50);
+        //this.musicVolumeSlider.adjustValue(20);
+        this.musicVolumeSlider.setShowTickMarks(true);
+        this.musicVolumeSlider.setShowTickLabels(true);
+        this.musicVolumeSlider.setMajorTickUnit(20);
         this.effectsVolumeSlider = new Slider(0, 100, 50);
+        this.effectsVolumeSlider.setShowTickMarks(true);
+        this.effectsVolumeSlider.setShowTickLabels(true);
+        this.effectsVolumeSlider.setMajorTickUnit(20);
         CheckBox fullscreenCheckbox = new CheckBox("Schermo intero");
 
         this.musicVolumeSlider.valueProperty().addListener((observable, oldValue, newValue) -> {
@@ -554,15 +572,6 @@ public class PentagoGame extends Application {
         optionsStage.showAndWait();
     }*/
 
-    private void showGameTree() {
-        // Implement game tree visualization here
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Albero di Gioco");
-        alert.setHeaderText(null);
-        alert.setContentText("Visualizzazione dell'albero di gioco non ancora implementata.");
-        alert.showAndWait();
-    }
-
     public void updateBoard(PentagoBoard board) {
         for (int i = 0; i < BOARD_SIZE; i++) {
             for (int j = 0; j < BOARD_SIZE; j++) {
@@ -570,16 +579,16 @@ public class PentagoGame extends Application {
             }
         }
         this.hideRotationOptions();
-        //this.setBlackTextColor();
+        this.setBlackTextColor();
     }
 
-    /*public void setBlackTextColor() {
+    public void setBlackTextColor() {
         instructionLabel.setTextFill(Color.BLACK);
     }
 
     public void setRedTextColor() {
         instructionLabel.setTextFill(Color.RED);
-    }*/
+    }
 
     public void setInstructionText(String text) {
         instructionLabel.setText(text);
@@ -618,6 +627,110 @@ public class PentagoGame extends Application {
             Circle backgroundCircle = (Circle) cellPane.getChildren().get(0);
             backgroundCircle.setFill(Color.GREEN);
         }
+    }
+
+    private void createGameHistoryView() {
+        gameHistoryRoot = new VBox(10);
+        gameHistoryScrollPane = new ScrollPane(gameHistoryRoot);
+        gameHistoryScrollPane.setFitToWidth(true);
+        gameHistoryScrollPane.setFitToHeight(true);
+
+        historyStage = new Stage();
+        historyStage.setScene(new Scene(gameHistoryScrollPane, 600, 400));
+        historyStage.setTitle("Storico partita");
+    }
+
+    private void showGameHistory() {
+        if (historyStage != null) {
+            historyStage.show();
+        }
+    }
+
+    public void updateGameHistory(PentagoGameState state1, PentagoGameState state2) {
+        HBox turnView = createTurnView(state1, state2);
+        gameHistoryRoot.getChildren().add(turnView);
+        gameHistoryScrollPane.setVvalue(1.0); // Scroll to bottom
+    }
+
+    private HBox createTurnView(PentagoGameState state1, PentagoGameState state2) {
+        HBox turnView = new HBox(20);
+        turnView.setAlignment(Pos.CENTER);
+
+        int turnNumber = gameHistoryRoot.getChildren().size() + 1;
+
+        VBox player1View = createPlayerView(state1, 1, turnNumber);
+        VBox player2View = createPlayerView(state2, 2, turnNumber);
+
+        turnView.getChildren().addAll(player1View, player2View);
+        return turnView;
+    }
+
+    private VBox createPlayerView(PentagoGameState state, int playerNumber, int turnNumber) {
+        VBox playerView = new VBox(5);
+        playerView.setAlignment(Pos.CENTER);
+
+        Label turnInfo = new Label("Turno " + turnNumber + "\nGiocatore " + playerNumber);
+        GridPane boardView = createMiniatureBoardView(state.getBoard());
+
+        playerView.getChildren().addAll(turnInfo, boardView);
+        return playerView;
+    }
+
+    private GridPane createMiniatureBoardView(PentagoBoard board) {
+        GridPane miniBoard = new GridPane();
+        miniBoard.setHgap(1);
+        miniBoard.setVgap(1);
+
+        for (int i = 0; i < PentagoBoard.BOARD_SIZE; i++) {
+            for (int j = 0; j < PentagoBoard.BOARD_SIZE; j++) {
+                Rectangle cell = new Rectangle(15, 15);
+                cell.setFill(board.getCell(i, j) == 0 ? Color.WHITE :
+                        board.getCell(i, j) == 1 ? Color.BLACK : Color.RED);
+                cell.setStroke(Color.BLACK);
+                miniBoard.add(cell, j, i);
+            }
+        }
+
+        return miniBoard;
+    }
+
+    public void showSaveLogDialog(Consumer<String> saveFunction) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Salva GameLog");
+        alert.setHeaderText("Scegli");
+        alert.setContentText("Scegli il formato del GameLog:");
+
+        ButtonType buttonTypeText = new ButtonType("File di testo");
+        ButtonType buttonTypeExcel = new ButtonType("File Excel");
+        ButtonType buttonTypeCancel = new ButtonType("Annulla", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+        alert.getButtonTypes().setAll(buttonTypeText, buttonTypeExcel, buttonTypeCancel);
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isPresent()) {
+            if (result.get() == buttonTypeText) {
+                saveFunction.accept("txt");
+            } else if (result.get() == buttonTypeExcel) {
+                saveFunction.accept("xlsx");
+            }
+        }
+
+        // Save game history snapshot
+        if (gameHistoryRoot != null) {
+            gameHistoryScrollPane.setFitToHeight(false);
+            gameHistoryScrollPane.setPrefViewportHeight(gameHistoryRoot.getBoundsInLocal().getHeight());
+            WritableImage snapshot = gameHistoryScrollPane.snapshot(new SnapshotParameters(), null);
+            controller.getDataManager().saveGameHistorySnapshot(snapshot);
+            gameHistoryScrollPane.setFitToHeight(true);
+        }
+    }
+
+    public void resetGame() {
+        gameLog.clear();
+        if (gameHistoryRoot != null) {
+            gameHistoryRoot.getChildren().clear();
+        }
+        // Aggiungere qui altre operazioni di reset se necessarie
     }
 
     // Getters

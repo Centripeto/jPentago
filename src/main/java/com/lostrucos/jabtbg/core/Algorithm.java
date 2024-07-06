@@ -4,7 +4,6 @@ package com.lostrucos.jabtbg.core;
  * Represents an algorithm used by an agent to decide actions in the game.
  */
 public interface Algorithm<T extends GameState<E>, E extends Action> {
-
     /**
      * Initializes the algorithm with the given game and agent.
      *
@@ -20,6 +19,11 @@ public interface Algorithm<T extends GameState<E>, E extends Action> {
      * @param state the state of the game
      */
     void initialize(T state);
+
+    /**
+     * Sets the strategy.
+     */
+    void setUtilityStrategy(UtilityStrategy<T, E> strategy);
 
     /**
      * Resets the algorithm internal information
@@ -57,5 +61,4 @@ public interface Algorithm<T extends GameState<E>, E extends Action> {
      * @return the new state after applying the action
      */
     GameState<E> applyPseudoAction(T state, E action);
-
 }

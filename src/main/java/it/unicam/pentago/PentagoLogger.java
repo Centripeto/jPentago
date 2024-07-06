@@ -4,6 +4,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+
+import it.unicam.pentago.models.PentagoAction;
 import javafx.scene.control.TextArea;
 
 public class PentagoLogger {
@@ -14,11 +16,12 @@ public class PentagoLogger {
     public PentagoLogger(TextArea logArea) {
         this.gameLog = new StringBuilder();
         this.logArea = logArea;
+        this.gameLog.append("---Inizio della partita---\n\n");
+        this.updateLogArea("---Inizio della partita---\n\n");
     }
 
     public void logAction(PentagoAction action, String player) {
-        String logEntry = String.format("%s - %s ha eseguito l'azione: (%d, %d), rotazione quadrante %d %s\n",
-                LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+        String logEntry = String.format("%s ha eseguito l'azione: (%d, %d) ruotando il quadrante %d %s\n",
                 player, action.getRow(), action.getCol(), action.getQuadrant(),
                 action.isClockwise() ? "in senso orario" : "in senso antiorario");
         gameLog.append(logEntry);

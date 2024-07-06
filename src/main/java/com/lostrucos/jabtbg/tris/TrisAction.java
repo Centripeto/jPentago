@@ -40,5 +40,4 @@ public class TrisAction implements Action {
     public int hashCode() {
         return Objects.hash(x, y, player);
     }
-
 }
