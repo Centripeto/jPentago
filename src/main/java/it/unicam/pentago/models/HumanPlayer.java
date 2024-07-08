@@ -2,11 +2,11 @@ package it.unicam.pentago.models;
 
 import com.lostrucos.jabtbg.core.*;
 
-public class HumanAgent implements Agent<PentagoGameState, PentagoAction> {
+public class HumanPlayer implements Player<PentagoGameState, PentagoAction> {
     private int playerIndex;
     private PentagoAction lastAction;
 
-    public HumanAgent(int playerIndex) {
+    public HumanPlayer(int playerIndex) {
         this.playerIndex = playerIndex;
     }
 
@@ -25,18 +25,7 @@ public class HumanAgent implements Agent<PentagoGameState, PentagoAction> {
     }
 
     @Override
-    public void updateAfterAction(PentagoGameState state, PentagoAction action) {
-        // Clear the last action after it's been used
-        lastAction = null;
-    }
-
-    @Override
-    public void reset() {
-        lastAction = null;
-    }
-
-    @Override
     public String toString() {
-        return "Human Agent (Player " + playerIndex + ")";
+        return "Giocatore umano (Giocatore " + playerIndex + ")";
     }
 }

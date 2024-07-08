@@ -4,7 +4,9 @@ import com.lostrucos.jabtbg.algorithms.mcts.MCTSAlgorithm;
 import com.lostrucos.jabtbg.core.*;
 import com.lostrucos.jabtbg.core.UtilityStrategy;
 import it.unicam.pentago.models.*;
+import it.unicam.pentago.strategies.AdvancedPentagoStrategy;
 import it.unicam.pentago.strategies.BalancedPentagoUtility;
+import it.unicam.pentago.strategies.StrategicPentagoUtility;
 import javafx.application.Platform;
 
 import java.util.ArrayList;
@@ -13,8 +15,8 @@ import java.util.List;
 public class PentagoController implements Game<PentagoGameState, PentagoAction> {
     private PentagoGameState currentState;
     private PentagoGameState previousState;
-    private Agent<PentagoGameState, PentagoAction> player1;
-    private Agent<PentagoGameState, PentagoAction> player2;
+    private Player<PentagoGameState, PentagoAction> player1;
+    private Player<PentagoGameState, PentagoAction> player2;
     private PentagoLogger logger;
     private PentagoGame gameView;
     private PentagoDataManager dataManager;
@@ -37,7 +39,7 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
         player1 = createAgent(player1Type, 0, difficulty1);
         player2 = createAgent(player2Type, 1, difficulty2);
 
-        isAIvsAI = player1 instanceof AIAgent && player2 instanceof AIAgent;
+        isAIvsAI = player1 instanceof AIPlayer && player2 instanceof AIPlayer;
 
         gameView.resetGame();
         updateGameView();
@@ -48,13 +50,13 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
         }
     }
 
-    private Agent<PentagoGameState, PentagoAction> createAgent(String type, int playerIndex, String difficulty) {
+    private Player<PentagoGameState, PentagoAction> createAgent(String type, int playerIndex, String difficulty) {
         if ("Umano".equals(type)) {
-            return new HumanAgent(playerIndex);
+            return new HumanPlayer(playerIndex);
         } else {
             Algorithm<PentagoGameState, PentagoAction> algorithm = createAlgorithm(type, difficulty);
             UtilityStrategy utilityStrategy = createUtilityStrategy(difficulty);
-            return new AIAgent(playerIndex, algorithm, utilityStrategy);
+            return new AIPlayer(playerIndex, algorithm, utilityStrategy);
         }
     }
 
@@ -77,28 +79,32 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
             case "Facile":
                 return new BalancedPentagoUtility();
             case "Normale":
-                return new BalancedPentagoUtility();
+                return new StrategicPentagoUtility();
             case "Difficile":
                 return new BalancedPentagoUtility();
             default:
-                return new BalancedPentagoUtility();
+                return new StrategicPentagoUtility();
         }
     }
 
     private int getIterationsForDifficulty(String difficulty) {
         switch (difficulty) {
-            case "Facile": return 500;
-            case "Normale": return 1000;
-            case "Difficile": return 2000;
-            default: return 100000;
+            case "Facile":
+                return 3000;
+            case "Normale":
+                return 3000;
+            case "Difficile":
+                return 250000;
+            default:
+                return 100000;
         }
     }
 
     public void handleCellClick(int row, int col) {
         if (currentState.getBoard().getCell(row, col) == 0) {
-            if (currentState.getCurrentPlayer() == 0 && player1 instanceof HumanAgent) {
+            if (currentState.getCurrentPlayer() == 0 && player1 instanceof HumanPlayer) {
                 gameView.showRotationOptions();
-            } else if (currentState.getCurrentPlayer() == 1 && player2 instanceof HumanAgent) {
+            } else if (currentState.getCurrentPlayer() == 1 && player2 instanceof HumanPlayer) {
                 gameView.showRotationOptions();
             }
         } else {
@@ -108,10 +114,10 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
     }
 
     public void handleRotation(int quadrant, boolean clockwise) {
-        Agent<PentagoGameState, PentagoAction> currentAgent = currentState.getCurrentPlayer() == 0 ? player1 : player2;
-        if (currentAgent instanceof HumanAgent) {
+        Player<PentagoGameState, PentagoAction> currentPlayer = currentState.getCurrentPlayer() == 0 ? player1 : player2;
+        if (currentPlayer instanceof HumanPlayer) {
             PentagoAction action = new PentagoAction(gameView.getSelectedRow(), gameView.getSelectedColumn(), quadrant, clockwise, currentState.getCurrentPlayer());
-            ((HumanAgent) currentAgent).setAction(action);
+            ((HumanPlayer) currentPlayer).setAction(action);
             applyAction(action);
             if (!currentState.isTerminalNode()) {
                 makeMove(currentState.getCurrentPlayer() == 0 ? player1 : player2);
@@ -121,14 +127,14 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
         }
     }
 
-    private void makeMove(Agent<PentagoGameState, PentagoAction> agent) {
-        gameView.setInstructionText((agent == player1 ? "Giocatore 1" : "Giocatore 2") + " sta pensando...");
+    private void makeMove(Player<PentagoGameState, PentagoAction> player) {
+        gameView.setInstructionText((player == player1 ? "Giocatore 1" : "Giocatore 2") + " sta pensando...");
 
-        if (agent instanceof AIAgent) {
+        if (player instanceof AIPlayer) {
             new Thread(() -> {
                 try {
                     long startTime = System.nanoTime();
-                    PentagoAction aiAction = agent.getAction(currentState);
+                    PentagoAction aiAction = player.getAction(currentState);
                     long endTime = System.nanoTime();
                     long decisionTime = (endTime - startTime) / 1_000_000; // In millisecondi
 
@@ -241,11 +247,6 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
     }
 
     @Override
-    public InformationSet getInformationSet(int playerIndex, PentagoGameState gameState) {
-        return null;
-    }
-
-    @Override
     public PentagoGameState getInitialState() {
         return null;
     }
@@ -256,37 +257,7 @@ public class PentagoController implements Game<PentagoGameState, PentagoAction> 
     }
 
     @Override
-    public int getNumberOfPlayers() {
-        return 0;
-    }
-
-    @Override
-    public PentagoGameState getNextState(PentagoGameState state, List<PentagoAction> actions) {
-        return null;
-    }
-
-    @Override
     public PentagoGameState getNextState(PentagoGameState state, PentagoAction action) {
         return (PentagoGameState) state.applyAction(action);
-    }
-
-    @Override
-    public List<PentagoAction> getPlayerActions(int playerIndex, PentagoGameState gameState) {
-        return List.of();
-    }
-
-    @Override
-    public int getCurrentPlayer() {
-        return currentState.getCurrentPlayer();
-    }
-
-    @Override
-    public boolean isTerminal(GameState state) {
-        return false;
-    }
-
-    @Override
-    public double getUtility(GameState state, int playerIndex) {
-        return 0;
     }
 }

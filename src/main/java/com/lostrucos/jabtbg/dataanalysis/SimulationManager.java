@@ -6,6 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 public interface SimulationManager<T extends GameState<E>, E extends Action> {
-    void runSimulation(Game<T, E> game, List<Agent<T, E>> agents);
+    void runSimulation(Game<T, E> game, List<Player<T, E>> players);
     Map<String, Object> getSimulationResult();
 }

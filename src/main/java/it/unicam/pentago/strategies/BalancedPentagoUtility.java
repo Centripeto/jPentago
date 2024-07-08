@@ -41,6 +41,7 @@ public class BalancedPentagoUtility implements UtilityStrategy<PentagoGameState,
         return Math.max(0, Math.min(1, value)); // Normalizza tra 0 e 1
     }
 
+    @Override
     public List<PentagoAction> suggestStrategicMoves(PentagoGameState state, int playerIndex) {
         List<PentagoAction> suggestedMoves = new ArrayList<>();
 

@@ -1,6 +1,5 @@
 package it.unicam.pentago.strategies;
 
-import it.unicam.pentago.models.AdvancedPentagoStrategy;
 import it.unicam.pentago.models.PentagoAction;
 import it.unicam.pentago.models.PentagoGameState;
 import com.lostrucos.jabtbg.core.*;
@@ -28,7 +27,6 @@ public class StrategicPentagoUtility implements UtilityStrategy<PentagoGameState
         int winner = state.checkForWinner();
         if (winner == playerIndex) return 1.0;
         if (winner != -1) return 0.0;
-        //if (state.isTie()) return 0.5;
 
         double immediateThreats = evaluateImmediateThreats(state, playerIndex);
         if (immediateThreats > 0) return 0.9 + (immediateThreats * 0.1);
@@ -65,6 +63,7 @@ public class StrategicPentagoUtility implements UtilityStrategy<PentagoGameState
                 .orElse(0.0);
     }
 
+    @Override
     public List<PentagoAction> suggestStrategicMoves(PentagoGameState state, int playerIndex) {
         List<PentagoAction> suggestedMoves = new ArrayList<>();
 

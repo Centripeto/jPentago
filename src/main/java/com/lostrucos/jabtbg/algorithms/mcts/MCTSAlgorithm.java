@@ -1,7 +1,6 @@
 package com.lostrucos.jabtbg.algorithms.mcts;
 
 import com.lostrucos.jabtbg.core.*;
-import it.unicam.pentago.models.PentagoGameState;
 
 import java.util.*;
 
@@ -29,9 +28,6 @@ public class MCTSAlgorithm<E extends Action, T extends GameState<E>> implements 
         this.explorationConstant = explorationConstant;
         this.gameTree = new HashMap<>();
     }
-
-    @Override
-    public void initialize(Game<T, E> game, Agent<T, E> agent) {}
 
     /**
      * Initializes the algorithm with the given game and agent.
@@ -73,16 +69,16 @@ public class MCTSAlgorithm<E extends Action, T extends GameState<E>> implements 
         long startTime = System.currentTimeMillis();
         int iterations = 0;
 
-        for (int i = 0; i < numIterations; i++) {
-            //while(System.currentTimeMillis() - startTime < TIME_LIMIT_MS && iterations < numIterations) {
-            //iterations++;
+        //for (int i = 0; i < numIterations; i++) {
+            while(System.currentTimeMillis() - startTime < TIME_LIMIT_MS && iterations < numIterations) {
+            iterations++;
             MCTSNode<T, E> selectedNode = select(rootNode);
             MCTSNode<T, E> expandedNode = expand(selectedNode);
             double reward = simulate(expandedNode);
             backpropagate(expandedNode, reward);
         }
 
-        //System.out.println("MCTS completed " + iterations + " iterations in " + (System.currentTimeMillis() - startTime) + "ms");
+        System.out.println("MCTS completed " + iterations + " iterations in " + (System.currentTimeMillis() - startTime) + "ms");
 
         return getBestAction(rootNode);
     }
@@ -90,16 +86,6 @@ public class MCTSAlgorithm<E extends Action, T extends GameState<E>> implements 
     @Override
     public GameState<E> applyPseudoAction(T state, E action) {
         return state.applyAction(action);
-    }
-
-    /**
-     * Updates the tree after an action is taken.
-     *
-     * @param state  the new game state.
-     * @param action the action taken.
-     */
-    @Override
-    public void updateAfterAction(GameState state, Action action) {
     }
 
     /**
@@ -124,8 +110,8 @@ public class MCTSAlgorithm<E extends Action, T extends GameState<E>> implements 
     private MCTSNode<T, E> expand(MCTSNode<T, E> node) {
         if (node.isTerminal()) return node;
 
-        //List<E> untriedActions = utilityStrategy.suggestStrategicMoves((PentagoGameState)node.getState(), node.getState().getCurrentPlayer());
-        List<E> untriedActions = node.getUntriedActions();
+        List<E> untriedActions = utilityStrategy.suggestStrategicMoves(node.getState(), node.getState().getCurrentPlayer());
+        //List<E> untriedActions = node.getUntriedActions();
         if (untriedActions.isEmpty()) return node;
 
         E availableRandomAction = untriedActions.get(new Random().nextInt(untriedActions.size()));
@@ -149,7 +135,7 @@ public class MCTSAlgorithm<E extends Action, T extends GameState<E>> implements 
     private double simulate(MCTSNode<T, E> node) {
         MCTSNode<T, E> terminalNode = new MCTSNode<>((T) node.getState().deepCopy(), node.getParentNode());
         while (!terminalNode.getState().isTerminalNode()) {
-            //List<E> actions = utilityStrategy.suggestStrategicMoves((PentagoGameState) terminalNode.getState(), terminalNode.getState().getCurrentPlayer());
+            //List<E> actions = utilityStrategy.suggestStrategicMoves(terminalNode.getState(), terminalNode.getState().getCurrentPlayer());
             List<E> actions = terminalNode.getState().getAvailableActions(terminalNode.getState().getCurrentPlayer());
             E randomAction = actions.get(new Random().nextInt(actions.size()));
             this.applyPseudoAction(terminalNode.getState(), randomAction);

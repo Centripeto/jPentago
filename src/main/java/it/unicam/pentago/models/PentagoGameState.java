@@ -1,6 +1,7 @@
 package it.unicam.pentago.models;
 
 import com.lostrucos.jabtbg.core.*;
+
 import java.util.*;
 
 public class PentagoGameState implements GameState<PentagoAction> {
@@ -111,19 +112,6 @@ public class PentagoGameState implements GameState<PentagoAction> {
         return board;
     }
 
-    @Override
-    public List<Integer> getPlayersInGame() {
-        return Arrays.asList(0, 1);
-    }
-
-    @Override
-    public boolean isPlayerStillInGame(int player) {
-        return true; // Both players are always in the game in Pentago
-    }
-
-    @Override
-    public double getUtility(int playerIndex) {return 1.0;}
-
     public int countAlignedPieces(int playerIndex) {
         int count = 0;
         int playerValue = playerIndex + 1;
@@ -184,7 +172,7 @@ public class PentagoGameState implements GameState<PentagoAction> {
         return getAvailableActions(playerIndex).size();
     }
 
-    int countNInARow(int playerIndex, int n) {
+    public int countNInARow(int playerIndex, int n) {
         return board.countNInARow(playerIndex, n);
     }
 
